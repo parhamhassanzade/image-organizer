@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -21,7 +22,7 @@ from PySide6.QtWidgets import (
 
 from services.category_service import load_category_settings
 from services.file_service import create_zip_archive
-from services.naming_service import generate_new_filename
+from services.naming_service import generate_new_filename, sanitize_filename_part
 from ui.settings_dialog import SettingsDialog
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
@@ -373,10 +374,17 @@ class MainWindow(QWidget):
         settings_label = QLabel("مدیریت کتگوری‌ها")
         settings_label.setObjectName("fieldLabel")
         settings_hint = QLabel(
-            "از بخش تنظیمات، کتگوری و ساب‌کتگوری‌ها را همراه با محدودیت تعداد فایل و نام خروجی پیش‌فرض تعریف کن."
+            "از بخش تنظیمات، کتگوری و ساب‌کتگوری‌ها را همراه با محدودیت تعداد فایل و نام خروجی عکس تعریف کن."
         )
         settings_hint.setObjectName("mutedText")
         settings_hint.setWordWrap(True)
+
+        archive_name_label = QLabel("Final zip name")
+        archive_name_label.setObjectName("fieldLabel")
+        self.archive_name_input = QLineEdit()
+        self.archive_name_input.setPlaceholderText(
+            "اختیاری؛ اگر خالی باشد از نام کتگوری یا حالت ترکیبی استفاده می‌شود"
+        )
 
         settings_text_layout.addWidget(settings_label)
         settings_text_layout.addWidget(settings_hint)
@@ -412,6 +420,9 @@ class MainWindow(QWidget):
         controls_layout.addWidget(self.folder_label)
         controls_layout.addWidget(self.folder_button)
         controls_layout.addWidget(folder_hint)
+        controls_layout.addSpacing(6)
+        controls_layout.addWidget(archive_name_label)
+        controls_layout.addWidget(self.archive_name_input)
         controls_layout.addSpacing(6)
         controls_layout.addLayout(self.settings_header)
         controls_layout.addSpacing(4)
@@ -703,10 +714,22 @@ class MainWindow(QWidget):
 
         return all_uploads
 
-    @staticmethod
-    def build_archive_stem(categories: list[str]) -> str:
+    def resolve_archive_stem(self, categories: list[str]) -> str | None:
+        custom_name = self.archive_name_input.text().strip()
+        if custom_name:
+            clean_name = sanitize_filename_part(custom_name)
+            if not clean_name:
+                QMessageBox.warning(
+                    self,
+                    "اسم ZIP نامعتبر است",
+                    "اسم فایل ZIP معتبر نیست. یک نام قابل استفاده وارد کن."
+                )
+                return None
+            return clean_name
+
         if len(categories) == 1:
-            return categories[0]
+            return sanitize_filename_part(categories[0]) or "export"
+
         return f"combined-{len(categories)}-categories"
 
     def update_selection_summary(self):
@@ -824,7 +847,10 @@ class MainWindow(QWidget):
                     archive_items.append((file_path, final_name))
 
         try:
-            archive_stem = self.build_archive_stem(sorted(all_uploads))
+            archive_stem = self.resolve_archive_stem(sorted(all_uploads))
+            if archive_stem is None:
+                return
+
             archive_path = create_zip_archive(
                 self.base_folder,
                 archive_stem,

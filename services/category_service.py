@@ -53,11 +53,13 @@ def add_category_entry(
     subcategory: str,
     max_files: int,
     output_name: str,
+    archive_name: str,
 ) -> dict[str, list[dict[str, int | str]]]:
     clean_category = category.strip()
     clean_subcategory = normalize_subcategory_path(subcategory)
     clean_max_files = normalize_max_files(max_files)
     clean_output_name = normalize_output_name(output_name)
+    clean_archive_name = normalize_archive_name(archive_name)
 
     if not clean_category:
         raise ValueError("نام کتگوری نمی‌تواند خالی باشد")
@@ -68,6 +70,12 @@ def add_category_entry(
     categories = load_category_settings()
     category_items = categories.setdefault(clean_category, [])
 
+    if not clean_archive_name and category_items:
+        clean_archive_name = normalize_archive_name(category_items[0].get("archive_name", ""))
+
+    for item in category_items:
+        item["archive_name"] = clean_archive_name
+
     existing_entry = find_subcategory_entry(category_items, clean_subcategory)
     if existing_entry is None:
         category_items.append(
@@ -75,11 +83,13 @@ def add_category_entry(
                 "subcategory": clean_subcategory,
                 "max_files": clean_max_files,
                 "output_name": clean_output_name,
+                "archive_name": clean_archive_name,
             }
         )
     else:
         existing_entry["max_files"] = clean_max_files
         existing_entry["output_name"] = clean_output_name
+        existing_entry["archive_name"] = clean_archive_name
 
     category_items.sort(key=lambda item: str(item["subcategory"]))
     save_category_settings(categories)
@@ -139,6 +149,7 @@ def normalize_category_entry(entry) -> dict[str, int | str] | None:
             "subcategory": clean_subcategory,
             "max_files": 9999,
             "output_name": "",
+            "archive_name": "",
         }
 
     if not isinstance(entry, dict):
@@ -152,6 +163,7 @@ def normalize_category_entry(entry) -> dict[str, int | str] | None:
         "subcategory": clean_subcategory,
         "max_files": normalize_max_files(entry.get("max_files", 9999)),
         "output_name": normalize_output_name(entry.get("output_name", "")),
+        "archive_name": normalize_archive_name(entry.get("archive_name", "")),
     }
 
 
@@ -184,4 +196,8 @@ def normalize_subcategory_path(value: str) -> str:
 
 
 def normalize_output_name(value) -> str:
+    return str(value).strip()
+
+
+def normalize_archive_name(value) -> str:
     return str(value).strip()

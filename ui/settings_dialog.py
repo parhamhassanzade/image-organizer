@@ -258,7 +258,13 @@ class SettingsDialog(QDialog):
         output_name = self.output_name_input.text()
 
         try:
-            add_category_entry(category, subcategory, max_files, output_name)
+            add_category_entry(
+                category,
+                subcategory,
+                max_files,
+                output_name,
+                "",
+            )
         except ValueError as error:
             QMessageBox.warning(self, "خطا", str(error))
             return
