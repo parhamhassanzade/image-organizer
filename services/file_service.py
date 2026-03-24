@@ -1,45 +1,32 @@
 from pathlib import Path
 import zipfile
 
-from services.naming_service import generate_new_filename
 
-
-def create_archive_path(base_folder: str, category: str) -> Path:
+def create_archive_path(base_folder: str, archive_stem: str) -> Path:
     target = Path(base_folder)
     target.mkdir(parents=True, exist_ok=True)
-    return target / f"{category}.zip"
+    return target / f"{archive_stem}.zip"
 
 
 def create_zip_archive(
     base_folder: str,
-    category: str,
-    files_by_subcategory: dict[str, list[str]],
-    output_names_by_subcategory: dict[str, str],
+    archive_stem: str,
+    archive_items: list[tuple[str, str]],
 ) -> str:
-    archive_path = create_archive_path(base_folder, category)
-    has_files = False
+    archive_path = create_archive_path(base_folder, archive_stem)
+    used_names: set[str] = set()
 
     with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for subcategory_path in sorted(files_by_subcategory):
-            file_entries = files_by_subcategory[subcategory_path]
-            if not file_entries:
-                continue
-
-            has_files = True
-            leaf_subcategory = subcategory_path.split("/")[-1]
-            output_name = output_names_by_subcategory.get(subcategory_path, "")
-
-            for index, file_path in enumerate(file_entries, start=1):
-                new_name = generate_new_filename(
-                    leaf_subcategory,
-                    index,
-                    file_path,
-                    output_name,
+        for file_path, archive_name in archive_items:
+            if archive_name in used_names:
+                raise ValueError(
+                    f"نام خروجی تکراری است و نمی‌تواند در آرشیو نهایی استفاده شود: {archive_name}"
                 )
-                archive_name = f"{subcategory_path}/{new_name}"
-                archive.write(file_path, arcname=archive_name)
 
-    if not has_files:
+            archive.write(file_path, arcname=archive_name)
+            used_names.add(archive_name)
+
+    if not archive_items:
         raise ValueError("هیچ فایلی برای ساخت zip انتخاب نشده است")
 
     return str(archive_path)

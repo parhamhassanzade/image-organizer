@@ -309,7 +309,7 @@ class MainWindow(QWidget):
         hero_title.setObjectName("heroTitle")
 
         hero_subtitle = QLabel(
-            "برای هر ساب‌کتگوری عکس‌های جداگانه آپلود کن و در نهایت کل کتگوری را به صورت ZIP تحویل بگیر."
+            "برای هر ساب‌کتگوری عکس‌های جداگانه آپلود کن و در نهایت یک ZIP بگیر که همه عکس‌های rename‌شده از همه کتگوری‌های انتخاب‌شده داخل همان ریشه آرشیو باشند."
         )
         hero_subtitle.setObjectName("heroSubtitle")
         hero_subtitle.setWordWrap(True)
@@ -360,7 +360,7 @@ class MainWindow(QWidget):
         self.folder_button.setObjectName("ghostButton")
         self.folder_button.clicked.connect(self.select_base_folder)
 
-        folder_hint = QLabel("فایل ZIP نهایی با نام کتگوری داخل همین مسیر ذخیره می‌شود.")
+        folder_hint = QLabel("اگر چند کتگوری فایل داشته باشند، همه داخل یک ZIP مشترک در همین مسیر ذخیره می‌شوند.")
         folder_hint.setObjectName("mutedText")
         folder_hint.setWordWrap(True)
 
@@ -440,7 +440,7 @@ class MainWindow(QWidget):
         uploads_title = QLabel("آپلود برای هر ساب‌کتگوری")
         uploads_title.setObjectName("sectionTitle")
         uploads_subtitle = QLabel(
-            "هر ساب‌کتگوری یک ناحیه drag & drop مستقل دارد و نام نهایی فایل‌ها از تنظیمات همان ساب‌کتگوری خوانده می‌شود."
+            "هر ساب‌کتگوری یک ناحیه drag & drop مستقل دارد و نام نهایی فایل‌ها از تنظیمات همان ساب‌کتگوری خوانده می‌شود. همه فایل‌ها در ریشه ZIP نهایی قرار می‌گیرند."
         )
         uploads_subtitle.setObjectName("sectionSubtitle")
         uploads_subtitle.setWordWrap(True)
@@ -625,7 +625,7 @@ class MainWindow(QWidget):
         category_uploads = self.selected_files_by_category.setdefault(category, {})
 
         self.uploads_hint.setText(
-            "برای هر ساب‌کتگوری فایل‌ها را جداگانه اضافه کن. اگر نام خروجی در تنظیمات خالی باشد، از نام خود ساب‌کتگوری استفاده می‌شود."
+            "برای هر ساب‌کتگوری فایل‌ها را جداگانه اضافه کن. اگر نام خروجی در تنظیمات خالی باشد، از نام خود ساب‌کتگوری استفاده می‌شود و همه فایل‌ها بدون پوشه داخلی داخل ZIP می‌روند."
         )
 
         for entry in entries:
@@ -686,25 +686,68 @@ class MainWindow(QWidget):
         self.refresh_upload_widgets()
         self.update_selection_summary()
 
+    def get_all_category_uploads(self) -> dict[str, dict[str, list[str]]]:
+        all_uploads: dict[str, dict[str, list[str]]] = {}
+
+        for category, subcategory_uploads in self.selected_files_by_category.items():
+            if category not in self.category_settings:
+                continue
+
+            filtered_uploads = {
+                subcategory: files
+                for subcategory, files in subcategory_uploads.items()
+                if files
+            }
+            if filtered_uploads:
+                all_uploads[category] = filtered_uploads
+
+        return all_uploads
+
+    @staticmethod
+    def build_archive_stem(categories: list[str]) -> str:
+        if len(categories) == 1:
+            return categories[0]
+        return f"combined-{len(categories)}-categories"
+
     def update_selection_summary(self):
+        all_uploads = self.get_all_category_uploads()
+        total_files = sum(
+            len(files)
+            for subcategory_uploads in all_uploads.values()
+            for files in subcategory_uploads.values()
+        )
+        active_categories = len(all_uploads)
+        active_subcategories = sum(
+            1
+            for subcategory_uploads in all_uploads.values()
+            for files in subcategory_uploads.values()
+            if files
+        )
+
         category = self.category_combo.currentText()
         if category not in self.category_settings:
-            self.selection_badge.setText("0 فایل آماده")
-            self.file_count_badge.setText("بدون انتخاب")
+            self.selection_badge.setText(
+                f"{total_files} فایل در {active_categories} کتگوری"
+            )
+            self.file_count_badge.setText(
+                f"{active_subcategories} ساب‌کتگوری فعال"
+            )
             self.clear_category_button.setEnabled(False)
-            self.process_button.setEnabled(False)
+            self.process_button.setEnabled(total_files > 0)
             return
 
         category_uploads = self.selected_files_by_category.get(category, {})
-        total_files = sum(len(files) for files in category_uploads.values())
-        active_subcategories = sum(1 for files in category_uploads.values() if files)
+        current_total_files = sum(len(files) for files in category_uploads.values())
+        current_active_subcategories = sum(1 for files in category_uploads.values() if files)
         total_subcategories = len(self.category_settings[category])
 
         self.selection_badge.setText(
-            f"{total_files} فایل در {active_subcategories}/{total_subcategories} ساب‌کتگوری"
+            f"{total_files} فایل در {active_categories} کتگوری"
         )
-        self.file_count_badge.setText(f"{total_files} تصویر")
-        self.clear_category_button.setEnabled(total_files > 0)
+        self.file_count_badge.setText(
+            f"{current_total_files} فایل در {current_active_subcategories}/{total_subcategories} ساب‌کتگوری این کتگوری"
+        )
+        self.clear_category_button.setEnabled(current_total_files > 0)
         self.process_button.setEnabled(total_files > 0)
 
     def update_output_summary(self):
@@ -721,62 +764,71 @@ class MainWindow(QWidget):
         return self.selected_files_by_category.get(category, {})
 
     def process_files(self):
-        category = self.category_combo.currentText().strip()
-
         if not self.base_folder:
             QMessageBox.warning(self, "خطا", "اول پوشه اصلی را انتخاب کن")
             return
 
-        if category not in self.category_settings:
-            QMessageBox.warning(self, "خطا", "اول یک کتگوری ذخیره‌شده انتخاب کن")
-            return
-
-        category_entries = {
-            str(entry["subcategory"]): {
-                "max_files": int(entry["max_files"]),
-                "output_name": str(entry.get("output_name", "")).strip(),
-            }
-            for entry in self.category_settings[category]
-        }
-        current_uploads = self.get_current_category_uploads()
-        files_by_subcategory = {
-            subcategory: files
-            for subcategory, files in current_uploads.items()
-            if files
-        }
-
-        if not files_by_subcategory:
+        all_uploads = self.get_all_category_uploads()
+        if not all_uploads:
             QMessageBox.warning(
                 self,
                 "خطا",
-                "حداقل برای یکی از ساب‌کتگوری‌ها باید عکس انتخاب شود"
+                "حداقل برای یکی از ساب‌کتگوری‌ها در یکی از کتگوری‌ها باید عکس انتخاب شود"
             )
             return
 
-        for subcategory, files in files_by_subcategory.items():
-            entry = category_entries.get(subcategory)
-            if entry is None:
-                continue
+        archive_items: list[tuple[str, str]] = []
+        final_names = set()
+        for category, category_uploads in all_uploads.items():
+            category_entries = {
+                str(entry["subcategory"]): {
+                    "max_files": int(entry["max_files"]),
+                    "output_name": str(entry.get("output_name", "")).strip(),
+                }
+                for entry in self.category_settings[category]
+            }
 
-            max_files = int(entry["max_files"])
-            if len(files) > max_files:
-                QMessageBox.warning(
-                    self,
-                    "تعداد بیش از حد مجاز",
-                    f"برای {subcategory} فقط {max_files} فایل مجاز است."
-                )
-                return
+            for subcategory, files in category_uploads.items():
+                entry = category_entries.get(subcategory)
+                if entry is None:
+                    continue
+
+                max_files = int(entry["max_files"])
+                if len(files) > max_files:
+                    QMessageBox.warning(
+                        self,
+                        "تعداد بیش از حد مجاز",
+                        f"برای {category} / {subcategory} فقط {max_files} فایل مجاز است."
+                    )
+                    return
+
+                output_name = str(entry["output_name"])
+                leaf_subcategory = subcategory.split("/")[-1]
+
+                for index, file_path in enumerate(files, start=1):
+                    final_name = generate_new_filename(
+                        leaf_subcategory,
+                        index,
+                        file_path,
+                        output_name,
+                    )
+                    if final_name in final_names:
+                        QMessageBox.warning(
+                            self,
+                            "نام خروجی تکراری",
+                            f"نام {final_name} در خروجی نهایی تکراری می‌شود. نام ساب‌کتگوری یا New photo name را تغییر بده."
+                        )
+                        return
+
+                    final_names.add(final_name)
+                    archive_items.append((file_path, final_name))
 
         try:
-            output_names_by_subcategory = {
-                subcategory: str(entry["output_name"])
-                for subcategory, entry in category_entries.items()
-            }
+            archive_stem = self.build_archive_stem(sorted(all_uploads))
             archive_path = create_zip_archive(
                 self.base_folder,
-                category,
-                files_by_subcategory,
-                output_names_by_subcategory,
+                archive_stem,
+                archive_items,
             )
 
             self.last_output_path = archive_path
