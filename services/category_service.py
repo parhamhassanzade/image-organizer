@@ -52,10 +52,12 @@ def add_category_entry(
     category: str,
     subcategory: str,
     max_files: int,
+    output_name: str,
 ) -> dict[str, list[dict[str, int | str]]]:
     clean_category = category.strip()
     clean_subcategory = normalize_subcategory_path(subcategory)
     clean_max_files = normalize_max_files(max_files)
+    clean_output_name = normalize_output_name(output_name)
 
     if not clean_category:
         raise ValueError("نام کتگوری نمی‌تواند خالی باشد")
@@ -69,10 +71,15 @@ def add_category_entry(
     existing_entry = find_subcategory_entry(category_items, clean_subcategory)
     if existing_entry is None:
         category_items.append(
-            {"subcategory": clean_subcategory, "max_files": clean_max_files}
+            {
+                "subcategory": clean_subcategory,
+                "max_files": clean_max_files,
+                "output_name": clean_output_name,
+            }
         )
     else:
         existing_entry["max_files"] = clean_max_files
+        existing_entry["output_name"] = clean_output_name
 
     category_items.sort(key=lambda item: str(item["subcategory"]))
     save_category_settings(categories)
@@ -128,7 +135,11 @@ def normalize_category_entry(entry) -> dict[str, int | str] | None:
         if not clean_subcategory:
             return None
 
-        return {"subcategory": clean_subcategory, "max_files": 9999}
+        return {
+            "subcategory": clean_subcategory,
+            "max_files": 9999,
+            "output_name": "",
+        }
 
     if not isinstance(entry, dict):
         return None
@@ -140,6 +151,7 @@ def normalize_category_entry(entry) -> dict[str, int | str] | None:
     return {
         "subcategory": clean_subcategory,
         "max_files": normalize_max_files(entry.get("max_files", 9999)),
+        "output_name": normalize_output_name(entry.get("output_name", "")),
     }
 
 
@@ -169,3 +181,7 @@ def normalize_subcategory_path(value: str) -> str:
     normalized_value = value.strip().replace("\\", "/").replace(">", "/")
     parts = [part.strip() for part in normalized_value.split("/") if part.strip()]
     return "/".join(parts)
+
+
+def normalize_output_name(value) -> str:
+    return str(value).strip()

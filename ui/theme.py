@@ -25,6 +25,12 @@ QFrame#surfaceCard {
     border-radius: 24px;
 }
 
+QFrame#uploadCard {
+    background-color: #f8f4ed;
+    border: 1px solid #e4dacd;
+    border-radius: 20px;
+}
+
 QLabel#heroTitle {
     background: transparent;
     color: #132028;
@@ -52,8 +58,16 @@ QLabel#sectionTitle {
     font-weight: 700;
 }
 
+QLabel#uploadTitle {
+    background: transparent;
+    color: #132028;
+    font-size: 16px;
+    font-weight: 700;
+}
+
 QLabel#sectionSubtitle,
-QLabel#mutedText {
+QLabel#mutedText,
+QLabel#uploadMeta {
     background: transparent;
     color: #67727a;
     font-size: 13px;

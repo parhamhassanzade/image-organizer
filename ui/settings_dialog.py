@@ -78,7 +78,9 @@ class SettingsDialog(QDialog):
         form_eyebrow.setObjectName("sectionEyebrow")
         form_title = QLabel("افزودن دسته‌بندی")
         form_title.setObjectName("sectionTitle")
-        form_hint = QLabel("نام کتگوری و مسیر ساب‌کتگوری را وارد کن و بعد ذخیره بزن.")
+        form_hint = QLabel(
+            "یک کتگوری را یک بار وارد کن و بعد برای همان، چند ساب‌کتگوری مختلف اضافه کن."
+        )
         form_hint.setObjectName("sectionSubtitle")
         form_hint.setWordWrap(True)
 
@@ -100,6 +102,13 @@ class SettingsDialog(QDialog):
         self.limit_input.setValue(20)
         self.limit_input.setSuffix(" فایل")
 
+        output_name_label = QLabel("New photo name")
+        output_name_label.setObjectName("fieldLabel")
+        self.output_name_input = QLineEdit()
+        self.output_name_input.setPlaceholderText(
+            "اختیاری؛ اگر خالی باشد از نام ساب‌کتگوری استفاده می‌شود"
+        )
+
         self.add_button = QPushButton("ذخیره")
         self.add_button.setObjectName("primaryButton")
         self.add_button.clicked.connect(self.add_entry)
@@ -115,6 +124,8 @@ class SettingsDialog(QDialog):
         form_layout.addWidget(self.subcategory_input)
         form_layout.addWidget(limit_label)
         form_layout.addWidget(self.limit_input)
+        form_layout.addWidget(output_name_label)
+        form_layout.addWidget(self.output_name_input)
         form_layout.addWidget(self.add_button)
 
         list_card = QFrame()
@@ -186,14 +197,25 @@ class SettingsDialog(QDialog):
         entry_count = 0
 
         for category in sorted(categories):
+            header_item = QListWidgetItem(
+                f"{category}\n{len(categories[category])} ساب‌کتگوری"
+            )
+            header_item.setFlags(Qt.NoItemFlags)
+            header_item.setToolTip(category)
+            self.entries_list.addItem(header_item)
+
             for entry in categories[category]:
                 subcategory = str(entry["subcategory"])
                 max_files = int(entry["max_files"])
+                output_name = str(entry.get("output_name", "")).strip()
+                name_preview = output_name or subcategory.split("/")[-1]
                 item = QListWidgetItem(
-                    f"{category}\n{subcategory}\nحداکثر {max_files} فایل"
+                    f"  • {subcategory}\n    حداکثر {max_files} فایل\n    نام خروجی: {name_preview}"
                 )
                 item.setData(Qt.UserRole, (category, subcategory))
-                item.setToolTip(f"{category} / {subcategory} / {max_files} فایل")
+                item.setToolTip(
+                    f"{category} / {subcategory} / {max_files} فایل / نام خروجی: {name_preview}"
+                )
                 self.entries_list.addItem(item)
                 entry_count += 1
 
@@ -233,9 +255,10 @@ class SettingsDialog(QDialog):
         category = self.category_input.text()
         subcategory = self.subcategory_input.text()
         max_files = self.limit_input.value()
+        output_name = self.output_name_input.text()
 
         try:
-            add_category_entry(category, subcategory, max_files)
+            add_category_entry(category, subcategory, max_files, output_name)
         except ValueError as error:
             QMessageBox.warning(self, "خطا", str(error))
             return
@@ -243,9 +266,10 @@ class SettingsDialog(QDialog):
             QMessageBox.critical(self, "خطا", str(error))
             return
 
-        self.category_input.clear()
+        self.category_input.setText(category.strip())
         self.subcategory_input.clear()
-        self.limit_input.setValue(20)
+        self.output_name_input.clear()
+        self.subcategory_input.setFocus()
         self.refresh_entries()
 
     def delete_selected_entry(self):
@@ -254,7 +278,16 @@ class SettingsDialog(QDialog):
             QMessageBox.warning(self, "خطا", "اول یک مورد را انتخاب کن")
             return
 
-        category, subcategory = item.data(Qt.UserRole)
+        item_data = item.data(Qt.UserRole)
+        if not item_data:
+            QMessageBox.warning(
+                self,
+                "خطا",
+                "برای حذف، یکی از ساب‌کتگوری‌ها را انتخاب کن"
+            )
+            return
+
+        category, subcategory = item_data
 
         try:
             remove_category_entry(category, subcategory)
