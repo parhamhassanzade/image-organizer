@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -26,6 +27,7 @@ from services.naming_service import generate_new_filename, sanitize_filename_par
 from ui.settings_dialog import SettingsDialog
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+UPLOAD_COLUMNS = 4
 
 
 class FileDropListWidget(QListWidget):
@@ -135,7 +137,7 @@ class SubcategoryUploadWidget(QFrame):
 
         self.file_list = FileDropListWidget(self.handle_dropped_paths)
         self.file_list.setObjectName("fileDropList")
-        self.file_list.setToolTip("فایل یا پوشه را روی این ساب‌کتگوری رها کن")
+        self.file_list.setToolTip("فایل یا پوشه را رها کن")
         self.file_list.setSpacing(6)
         self.file_list.setWordWrap(True)
         self.file_list.setMinimumHeight(190)
@@ -143,7 +145,7 @@ class SubcategoryUploadWidget(QFrame):
         actions_layout = QHBoxLayout()
         actions_layout.setSpacing(10)
 
-        self.select_button = QPushButton("انتخاب عکس")
+        self.select_button = QPushButton("انتخاب")
         self.select_button.setObjectName("ghostButton")
         self.select_button.clicked.connect(self.select_files)
 
@@ -167,7 +169,7 @@ class SubcategoryUploadWidget(QFrame):
     def select_files(self):
         files, _ = QFileDialog.getOpenFileNames(
             self,
-            f"انتخاب عکس برای {self.subcategory}",
+            f"انتخاب فایل برای {self.subcategory}",
             "",
             "Images (*.png *.jpg *.jpeg *.webp *.bmp)"
         )
@@ -186,7 +188,7 @@ class SubcategoryUploadWidget(QFrame):
             QMessageBox.warning(
                 self,
                 "فایل نامعتبر",
-                "فقط فایل‌های تصویری یا پوشه‌های شامل تصویر قابل اضافه شدن هستند"
+                "فقط عکس یا پوشهٔ شامل عکس مجاز است."
             )
             return
 
@@ -201,7 +203,7 @@ class SubcategoryUploadWidget(QFrame):
             QMessageBox.warning(
                 self,
                 "بیش از حد مجاز",
-                f"برای {self.subcategory} فقط {self.max_files} فایل ذخیره شد."
+                f"فقط {self.max_files} فایل برای {self.subcategory} نگه داشته شد."
             )
 
         self.selected_files = accepted_files
@@ -214,7 +216,7 @@ class SubcategoryUploadWidget(QFrame):
 
         if not self.selected_files:
             empty_item = QListWidgetItem(
-                "هنوز فایلی برای این ساب‌کتگوری انتخاب نشده است.\nفایل را اینجا رها کن یا از دکمه انتخاب استفاده کن."
+                "فایلی انتخاب نشده.\nرها کن یا انتخاب کن."
             )
             empty_item.setFlags(Qt.NoItemFlags)
             empty_item.setTextAlignment(Qt.AlignCenter)
@@ -234,10 +236,10 @@ class SubcategoryUploadWidget(QFrame):
             )
             parent_path = metrics.elidedText(str(path.parent), Qt.ElideMiddle, 280)
             item = QListWidgetItem(
-                f"{path.name}\nنام خروجی: {target_name}\n{parent_path}"
+                f"{path.name}\n{target_name}\n{parent_path}"
             )
             item.setToolTip(
-                f"فایل اصلی: {file_path}\nنام خروجی: {target_name}"
+                f"{file_path}\n{target_name}"
             )
             self.file_list.addItem(item)
 
@@ -247,7 +249,7 @@ class SubcategoryUploadWidget(QFrame):
         self.clear_button.setEnabled(count > 0)
         output_preview = self.output_name.strip() or self.subcategory.split("/")[-1]
         self.meta_label.setText(
-            f"حداکثر {self.max_files} فایل • نام خروجی: {output_preview}"
+            f"{self.max_files} فایل | {output_preview}"
         )
 
     @staticmethod
@@ -309,9 +311,7 @@ class MainWindow(QWidget):
         hero_title = QLabel("Image Organizer")
         hero_title.setObjectName("heroTitle")
 
-        hero_subtitle = QLabel(
-            "برای هر ساب‌کتگوری عکس‌های جداگانه آپلود کن و در نهایت یک ZIP بگیر که همه عکس‌های rename‌شده از همه کتگوری‌های انتخاب‌شده داخل همان ریشه آرشیو باشند."
-        )
+        hero_subtitle = QLabel("برای هر ساب‌کتگوری عکس انتخاب کن و در پایان ZIP بگیر.")
         hero_subtitle.setObjectName("heroSubtitle")
         hero_subtitle.setWordWrap(True)
 
@@ -321,7 +321,7 @@ class MainWindow(QWidget):
         self.selection_badge = QLabel()
         self.selection_badge.setObjectName("statusBadge")
 
-        zip_badge = QLabel("Grouped ZIP Export")
+        zip_badge = QLabel("ZIP")
         zip_badge.setObjectName("accentBadge")
 
         self.hero_badges.addWidget(self.selection_badge)
@@ -341,27 +341,23 @@ class MainWindow(QWidget):
         controls_layout.setContentsMargins(22, 22, 22, 22)
         controls_layout.setSpacing(16)
 
-        controls_eyebrow = QLabel("تنظیمات")
-        controls_eyebrow.setObjectName("sectionEyebrow")
-        controls_title = QLabel("مسیر خروجی و کتگوری")
+        controls_title = QLabel("خروجی و کتگوری")
         controls_title.setObjectName("sectionTitle")
-        controls_subtitle = QLabel(
-            "کتگوری را انتخاب کن. ساب‌کتگوری‌های آن در پنل سمت راست نمایش داده می‌شوند و هر کدام آپلود جداگانه دارند."
-        )
+        controls_subtitle = QLabel("کتگوری را انتخاب کن.")
         controls_subtitle.setObjectName("sectionSubtitle")
         controls_subtitle.setWordWrap(True)
 
-        folder_label = QLabel("پوشه مقصد")
+        folder_label = QLabel("پوشه خروجی")
         folder_label.setObjectName("fieldLabel")
-        self.folder_label = QLabel("هنوز پوشه‌ای انتخاب نشده")
+        self.folder_label = QLabel("پوشه‌ای انتخاب نشده")
         self.folder_label.setObjectName("valueLabel")
         self.folder_label.setWordWrap(True)
 
-        self.folder_button = QPushButton("انتخاب پوشه اصلی")
+        self.folder_button = QPushButton("انتخاب پوشه")
         self.folder_button.setObjectName("ghostButton")
         self.folder_button.clicked.connect(self.select_base_folder)
 
-        folder_hint = QLabel("اگر چند کتگوری فایل داشته باشند، همه داخل یک ZIP مشترک در همین مسیر ذخیره می‌شوند.")
+        folder_hint = QLabel("خروجی در همین مسیر ذخیره می‌شود.")
         folder_hint.setObjectName("mutedText")
         folder_hint.setWordWrap(True)
 
@@ -371,20 +367,16 @@ class MainWindow(QWidget):
         settings_text_layout = QVBoxLayout()
         settings_text_layout.setSpacing(4)
 
-        settings_label = QLabel("مدیریت کتگوری‌ها")
+        settings_label = QLabel("کتگوری‌ها")
         settings_label.setObjectName("fieldLabel")
-        settings_hint = QLabel(
-            "از بخش تنظیمات، کتگوری و ساب‌کتگوری‌ها را همراه با محدودیت تعداد فایل و نام خروجی عکس تعریف کن."
-        )
+        settings_hint = QLabel("افزودن، حذف و ویرایش کتگوری‌ها")
         settings_hint.setObjectName("mutedText")
         settings_hint.setWordWrap(True)
 
-        archive_name_label = QLabel("Final zip name")
+        archive_name_label = QLabel("نام ZIP")
         archive_name_label.setObjectName("fieldLabel")
         self.archive_name_input = QLineEdit()
-        self.archive_name_input.setPlaceholderText(
-            "اختیاری؛ اگر خالی باشد از نام کتگوری یا حالت ترکیبی استفاده می‌شود"
-        )
+        self.archive_name_input.setPlaceholderText("اختیاری")
 
         settings_text_layout.addWidget(settings_label)
         settings_text_layout.addWidget(settings_hint)
@@ -396,24 +388,21 @@ class MainWindow(QWidget):
         self.settings_header.addLayout(settings_text_layout, 1)
         self.settings_header.addWidget(self.settings_button, 0, Qt.AlignTop)
 
-        category_label = QLabel("Category")
+        category_label = QLabel("کتگوری")
         category_label.setObjectName("fieldLabel")
         self.category_combo = QComboBox()
         self.category_combo.currentIndexChanged.connect(self.update_category_view)
 
-        self.category_info_label = QLabel(
-            "بعد از انتخاب کتگوری، ساب‌کتگوری‌های آن در پنل سمت راست ظاهر می‌شوند."
-        )
+        self.category_info_label = QLabel("یک کتگوری انتخاب کن.")
         self.category_info_label.setObjectName("mutedText")
         self.category_info_label.setWordWrap(True)
 
         output_note = QLabel("آخرین خروجی")
         output_note.setObjectName("fieldLabel")
-        self.output_label = QLabel("هنوز آرشیوی ساخته نشده است.")
+        self.output_label = QLabel("خروجی‌ای ساخته نشده.")
         self.output_label.setObjectName("outputLabel")
         self.output_label.setWordWrap(True)
 
-        controls_layout.addWidget(controls_eyebrow)
         controls_layout.addWidget(controls_title)
         controls_layout.addWidget(controls_subtitle)
         controls_layout.addWidget(folder_label)
@@ -446,17 +435,12 @@ class MainWindow(QWidget):
         uploads_text_layout = QVBoxLayout()
         uploads_text_layout.setSpacing(4)
 
-        uploads_eyebrow = QLabel("ورودی")
-        uploads_eyebrow.setObjectName("sectionEyebrow")
-        uploads_title = QLabel("آپلود برای هر ساب‌کتگوری")
+        uploads_title = QLabel("آپلود ساب‌کتگوری‌ها")
         uploads_title.setObjectName("sectionTitle")
-        uploads_subtitle = QLabel(
-            "هر ساب‌کتگوری یک ناحیه drag & drop مستقل دارد و نام نهایی فایل‌ها از تنظیمات همان ساب‌کتگوری خوانده می‌شود. همه فایل‌ها در ریشه ZIP نهایی قرار می‌گیرند."
-        )
+        uploads_subtitle = QLabel("برای هر ساب‌کتگوری فایل جداگانه انتخاب کن.")
         uploads_subtitle.setObjectName("sectionSubtitle")
         uploads_subtitle.setWordWrap(True)
 
-        uploads_text_layout.addWidget(uploads_eyebrow)
         uploads_text_layout.addWidget(uploads_title)
         uploads_text_layout.addWidget(uploads_subtitle)
 
@@ -466,9 +450,7 @@ class MainWindow(QWidget):
         self.uploads_top.addLayout(uploads_text_layout, 1)
         self.uploads_top.addWidget(self.file_count_badge, 0, Qt.AlignTop)
 
-        self.uploads_hint = QLabel(
-            "بعد از انتخاب کتگوری، کارت‌های آپلود برای ساب‌کتگوری‌ها اینجا ساخته می‌شوند."
-        )
+        self.uploads_hint = QLabel("کارت‌های آپلود اینجا نمایش داده می‌شوند.")
         self.uploads_hint.setObjectName("mutedText")
         self.uploads_hint.setWordWrap(True)
 
@@ -477,9 +459,12 @@ class MainWindow(QWidget):
         self.uploads_scroll_area.setFrameShape(QFrame.NoFrame)
 
         self.uploads_container = QWidget()
-        self.uploads_container_layout = QVBoxLayout(self.uploads_container)
+        self.uploads_container_layout = QGridLayout(self.uploads_container)
         self.uploads_container_layout.setContentsMargins(0, 0, 0, 0)
         self.uploads_container_layout.setSpacing(14)
+        self.uploads_container_layout.setAlignment(Qt.AlignTop)
+        for column in range(UPLOAD_COLUMNS):
+            self.uploads_container_layout.setColumnStretch(column, 1)
         self.uploads_scroll_area.setWidget(self.uploads_container)
 
         uploads_layout.addLayout(self.uploads_top)
@@ -492,16 +477,21 @@ class MainWindow(QWidget):
         self.footer_layout = QBoxLayout(QBoxLayout.LeftToRight)
         self.footer_layout.addStretch()
 
-        self.clear_category_button = QPushButton("پاک کردن آپلودهای این کتگوری")
+        self.clear_category_button = QPushButton("پاک کردن این کتگوری")
         self.clear_category_button.setObjectName("ghostButton")
         self.clear_category_button.clicked.connect(self.clear_current_category_uploads)
 
-        self.process_button = QPushButton("ساخت فایل ZIP")
+        self.clear_all_categories_button = QPushButton("پاک کردن همه کتگوری‌ها")
+        self.clear_all_categories_button.setObjectName("ghostButton")
+        self.clear_all_categories_button.clicked.connect(self.clear_all_category_uploads)
+
+        self.process_button = QPushButton("ساخت ZIP")
         self.process_button.setObjectName("primaryButton")
         self.process_button.clicked.connect(self.process_files)
         self.process_button.setMinimumHeight(52)
 
         self.footer_layout.addWidget(self.clear_category_button)
+        self.footer_layout.addWidget(self.clear_all_categories_button)
         self.footer_layout.addWidget(self.process_button)
 
         self.root_layout.addWidget(hero_card)
@@ -512,7 +502,7 @@ class MainWindow(QWidget):
         main_layout.addWidget(page_scroll)
 
     def select_base_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, "انتخاب پوشه اصلی")
+        folder = QFileDialog.getExistingDirectory(self, "انتخاب پوشه")
         if folder:
             self.base_folder = folder
             self.folder_label.setText(folder)
@@ -604,7 +594,7 @@ class MainWindow(QWidget):
 
         if category not in self.category_settings:
             self.category_info_label.setText(
-                "بعد از انتخاب کتگوری، ساب‌کتگوری‌های آن در پنل سمت راست ظاهر می‌شوند."
+                "یک کتگوری انتخاب کن."
             )
             self.refresh_upload_widgets()
             self.update_selection_summary()
@@ -617,7 +607,7 @@ class MainWindow(QWidget):
             if str(entry.get("output_name", "")).strip()
         )
         self.category_info_label.setText(
-            f"برای کتگوری {category} تعداد {subcategory_count} ساب‌کتگوری تعریف شده است. {configured_names} مورد نام خروجی سفارشی دارند."
+            f"{subcategory_count} ساب‌کتگوری | {configured_names} نام سفارشی"
         )
         self.refresh_upload_widgets()
         self.update_selection_summary()
@@ -628,15 +618,15 @@ class MainWindow(QWidget):
 
         category = self.category_combo.currentText()
         if category not in self.category_settings:
-            self.uploads_hint.setText("اول یک کتگوری انتخاب کن.")
-            self.add_uploads_placeholder("بعد از انتخاب کتگوری، کارت‌های آپلود اینجا ساخته می‌شوند.")
+            self.uploads_hint.setText("اول کتگوری را انتخاب کن.")
+            self.add_uploads_placeholder("کارت‌های آپلود اینجا می‌آیند.")
             return
 
         entries = self.category_settings[category]
         category_uploads = self.selected_files_by_category.setdefault(category, {})
 
         self.uploads_hint.setText(
-            "برای هر ساب‌کتگوری فایل‌ها را جداگانه اضافه کن. اگر نام خروجی در تنظیمات خالی باشد، از نام خود ساب‌کتگوری استفاده می‌شود و همه فایل‌ها بدون پوشه داخلی داخل ZIP می‌روند."
+            "برای هر ساب‌کتگوری فایل انتخاب کن."
         )
 
         for entry in entries:
@@ -652,9 +642,12 @@ class MainWindow(QWidget):
             )
             upload_widget.set_files(category_uploads.get(subcategory, []))
             self.upload_widgets[subcategory] = upload_widget
-            self.uploads_container_layout.addWidget(upload_widget)
-
-        self.uploads_container_layout.addStretch()
+            row = len(self.upload_widgets) - 1
+            self.uploads_container_layout.addWidget(
+                upload_widget,
+                row // UPLOAD_COLUMNS,
+                row % UPLOAD_COLUMNS,
+            )
 
     def add_uploads_placeholder(self, text: str):
         placeholder = QLabel(text)
@@ -662,8 +655,13 @@ class MainWindow(QWidget):
         placeholder.setAlignment(Qt.AlignCenter)
         placeholder.setWordWrap(True)
         placeholder.setMinimumHeight(180)
-        self.uploads_container_layout.addWidget(placeholder)
-        self.uploads_container_layout.addStretch()
+        self.uploads_container_layout.addWidget(
+            placeholder,
+            0,
+            0,
+            1,
+            UPLOAD_COLUMNS,
+        )
 
     def clear_layout(self, layout):
         while layout.count():
@@ -697,6 +695,11 @@ class MainWindow(QWidget):
         self.refresh_upload_widgets()
         self.update_selection_summary()
 
+    def clear_all_category_uploads(self):
+        self.selected_files_by_category = {}
+        self.refresh_upload_widgets()
+        self.update_selection_summary()
+
     def get_all_category_uploads(self) -> dict[str, dict[str, list[str]]]:
         all_uploads: dict[str, dict[str, list[str]]] = {}
 
@@ -721,8 +724,8 @@ class MainWindow(QWidget):
             if not clean_name:
                 QMessageBox.warning(
                     self,
-                    "اسم ZIP نامعتبر است",
-                    "اسم فایل ZIP معتبر نیست. یک نام قابل استفاده وارد کن."
+                    "نام ZIP نامعتبر است",
+                    "یک نام معتبر وارد کن."
                 )
                 return None
             return clean_name
@@ -750,12 +753,13 @@ class MainWindow(QWidget):
         category = self.category_combo.currentText()
         if category not in self.category_settings:
             self.selection_badge.setText(
-                f"{total_files} فایل در {active_categories} کتگوری"
+                f"{total_files} فایل | {active_categories} کتگوری"
             )
             self.file_count_badge.setText(
                 f"{active_subcategories} ساب‌کتگوری فعال"
             )
             self.clear_category_button.setEnabled(False)
+            self.clear_all_categories_button.setEnabled(total_files > 0)
             self.process_button.setEnabled(total_files > 0)
             return
 
@@ -765,17 +769,18 @@ class MainWindow(QWidget):
         total_subcategories = len(self.category_settings[category])
 
         self.selection_badge.setText(
-            f"{total_files} فایل در {active_categories} کتگوری"
+            f"{total_files} فایل | {active_categories} کتگوری"
         )
         self.file_count_badge.setText(
-            f"{current_total_files} فایل در {current_active_subcategories}/{total_subcategories} ساب‌کتگوری این کتگوری"
+            f"{current_total_files} فایل | {current_active_subcategories}/{total_subcategories} ساب‌کتگوری"
         )
         self.clear_category_button.setEnabled(current_total_files > 0)
+        self.clear_all_categories_button.setEnabled(total_files > 0)
         self.process_button.setEnabled(total_files > 0)
 
     def update_output_summary(self):
         if not self.last_output_path:
-            self.output_label.setText("هنوز آرشیوی ساخته نشده است.")
+            self.output_label.setText("خروجی‌ای ساخته نشده.")
             return
 
         self.output_label.setText(self.last_output_path)
@@ -788,7 +793,7 @@ class MainWindow(QWidget):
 
     def process_files(self):
         if not self.base_folder:
-            QMessageBox.warning(self, "خطا", "اول پوشه اصلی را انتخاب کن")
+            QMessageBox.warning(self, "خطا", "اول پوشه خروجی را انتخاب کن")
             return
 
         all_uploads = self.get_all_category_uploads()
@@ -796,7 +801,7 @@ class MainWindow(QWidget):
             QMessageBox.warning(
                 self,
                 "خطا",
-                "حداقل برای یکی از ساب‌کتگوری‌ها در یکی از کتگوری‌ها باید عکس انتخاب شود"
+                "حداقل یک عکس انتخاب کن"
             )
             return
 
@@ -839,7 +844,7 @@ class MainWindow(QWidget):
                         QMessageBox.warning(
                             self,
                             "نام خروجی تکراری",
-                            f"نام {final_name} در خروجی نهایی تکراری می‌شود. نام ساب‌کتگوری یا New photo name را تغییر بده."
+                            f"{final_name} تکراری می‌شود. نام خروجی را عوض کن."
                         )
                         return
 
@@ -863,7 +868,7 @@ class MainWindow(QWidget):
             QMessageBox.information(
                 self,
                 "موفق",
-                f"خروجی zip با موفقیت ساخته شد:\n{archive_path}"
+                f"ZIP ساخته شد:\n{archive_path}"
             )
 
         except Exception as error:

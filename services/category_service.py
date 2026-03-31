@@ -91,7 +91,6 @@ def add_category_entry(
         existing_entry["output_name"] = clean_output_name
         existing_entry["archive_name"] = clean_archive_name
 
-    category_items.sort(key=lambda item: str(item["subcategory"]))
     save_category_settings(categories)
     return categories
 
@@ -135,7 +134,6 @@ def normalize_category_entries(entries) -> list[dict[str, int | str]]:
         normalized_entries.append(normalized_entry)
         seen_subcategories.add(subcategory)
 
-    normalized_entries.sort(key=lambda item: str(item["subcategory"]))
     return normalized_entries
 
 

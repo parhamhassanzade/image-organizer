@@ -23,7 +23,7 @@ from services.category_service import add_category_entry, load_category_settings
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("تنظیمات کتگوری‌ها")
+        self.setWindowTitle("تنظیمات")
         self.resize(760, 560)
         self.setMinimumSize(560, 460)
 
@@ -53,17 +53,12 @@ class SettingsDialog(QDialog):
         header_layout.setContentsMargins(22, 20, 22, 20)
         header_layout.setSpacing(8)
 
-        header_eyebrow = QLabel("Library")
-        header_eyebrow.setObjectName("sectionEyebrow")
         header_title = QLabel("مدیریت کتگوری‌ها")
         header_title.setObjectName("sectionTitle")
-        header_subtitle = QLabel(
-            "برای هر کتگوری می‌توانی چند مسیر ساب‌کتگوری تعریف کنی. نمونه: shoes/sneakers"
-        )
+        header_subtitle = QLabel("تعریف کتگوری و ساب‌کتگوری")
         header_subtitle.setObjectName("sectionSubtitle")
         header_subtitle.setWordWrap(True)
 
-        header_layout.addWidget(header_eyebrow)
         header_layout.addWidget(header_title)
         header_layout.addWidget(header_subtitle)
 
@@ -74,27 +69,23 @@ class SettingsDialog(QDialog):
         form_layout.setContentsMargins(22, 22, 22, 22)
         form_layout.setSpacing(14)
 
-        form_eyebrow = QLabel("ورودی جدید")
-        form_eyebrow.setObjectName("sectionEyebrow")
-        form_title = QLabel("افزودن دسته‌بندی")
+        form_title = QLabel("افزودن مورد")
         form_title.setObjectName("sectionTitle")
-        form_hint = QLabel(
-            "یک کتگوری را یک بار وارد کن و بعد برای همان، چند ساب‌کتگوری مختلف اضافه کن."
-        )
+        form_hint = QLabel("هر سطر یک ساب‌کتگوری است.")
         form_hint.setObjectName("sectionSubtitle")
         form_hint.setWordWrap(True)
 
-        category_label = QLabel("Category")
+        category_label = QLabel("کتگوری")
         category_label.setObjectName("fieldLabel")
         self.category_input = QLineEdit()
         self.category_input.setPlaceholderText("مثال: shoes")
 
-        subcategory_label = QLabel("Subcategory path")
+        subcategory_label = QLabel("ساب‌کتگوری")
         subcategory_label.setObjectName("fieldLabel")
         self.subcategory_input = QLineEdit()
         self.subcategory_input.setPlaceholderText("مثال: sneakers/running")
 
-        limit_label = QLabel("Upload limit")
+        limit_label = QLabel("حداکثر فایل")
         limit_label.setObjectName("fieldLabel")
         self.limit_input = QSpinBox()
         self.limit_input.setMinimum(1)
@@ -102,19 +93,16 @@ class SettingsDialog(QDialog):
         self.limit_input.setValue(20)
         self.limit_input.setSuffix(" فایل")
 
-        output_name_label = QLabel("New photo name")
+        output_name_label = QLabel("نام خروجی")
         output_name_label.setObjectName("fieldLabel")
         self.output_name_input = QLineEdit()
-        self.output_name_input.setPlaceholderText(
-            "اختیاری؛ اگر خالی باشد از نام ساب‌کتگوری استفاده می‌شود"
-        )
+        self.output_name_input.setPlaceholderText("اختیاری")
 
         self.add_button = QPushButton("ذخیره")
         self.add_button.setObjectName("primaryButton")
         self.add_button.clicked.connect(self.add_entry)
         self.add_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        form_layout.addWidget(form_eyebrow)
         form_layout.addWidget(form_title)
         form_layout.addWidget(form_hint)
         form_layout.addSpacing(4)
@@ -141,15 +129,12 @@ class SettingsDialog(QDialog):
         list_text = QVBoxLayout()
         list_text.setSpacing(4)
 
-        list_eyebrow = QLabel("موارد ذخیره‌شده")
-        list_eyebrow.setObjectName("sectionEyebrow")
-        list_title = QLabel("کتگوری‌ها و مسیرها")
+        list_title = QLabel("لیست")
         list_title.setObjectName("sectionTitle")
-        list_hint = QLabel("برای حذف، یکی از موارد لیست را انتخاب کن.")
+        list_hint = QLabel("برای حذف، یک ساب‌کتگوری را انتخاب کن.")
         list_hint.setObjectName("sectionSubtitle")
         list_hint.setWordWrap(True)
 
-        list_text.addWidget(list_eyebrow)
         list_text.addWidget(list_title)
         list_text.addWidget(list_hint)
 
@@ -166,7 +151,7 @@ class SettingsDialog(QDialog):
         self.actions_layout = QBoxLayout(QBoxLayout.LeftToRight)
         self.actions_layout.setSpacing(12)
 
-        self.delete_button = QPushButton("حذف مورد انتخاب‌شده")
+        self.delete_button = QPushButton("حذف")
         self.delete_button.setObjectName("dangerButton")
         self.delete_button.clicked.connect(self.delete_selected_entry)
         self.delete_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -210,11 +195,11 @@ class SettingsDialog(QDialog):
                 output_name = str(entry.get("output_name", "")).strip()
                 name_preview = output_name or subcategory.split("/")[-1]
                 item = QListWidgetItem(
-                    f"  • {subcategory}\n    حداکثر {max_files} فایل\n    نام خروجی: {name_preview}"
+                    f"• {subcategory}\n{max_files} فایل | {name_preview}"
                 )
                 item.setData(Qt.UserRole, (category, subcategory))
                 item.setToolTip(
-                    f"{category} / {subcategory} / {max_files} فایل / نام خروجی: {name_preview}"
+                    f"{category} / {subcategory} / {max_files} فایل / {name_preview}"
                 )
                 self.entries_list.addItem(item)
                 entry_count += 1
@@ -281,7 +266,7 @@ class SettingsDialog(QDialog):
     def delete_selected_entry(self):
         item = self.entries_list.currentItem()
         if item is None:
-            QMessageBox.warning(self, "خطا", "اول یک مورد را انتخاب کن")
+            QMessageBox.warning(self, "خطا", "یک مورد را انتخاب کن")
             return
 
         item_data = item.data(Qt.UserRole)
@@ -289,7 +274,7 @@ class SettingsDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "خطا",
-                "برای حذف، یکی از ساب‌کتگوری‌ها را انتخاب کن"
+                "یک ساب‌کتگوری را انتخاب کن"
             )
             return
 
