@@ -580,7 +580,7 @@ class MainWindow(QWidget):
         self.category_combo.clear()
         self.category_combo.addItem("انتخاب کتگوری")
 
-        for category in sorted(self.category_settings):
+        for category in self.category_settings:
             self.category_combo.addItem(category)
 
         if current_category in self.category_settings:

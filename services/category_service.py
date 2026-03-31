@@ -35,12 +35,12 @@ def save_category_settings(categories: dict[str, list[dict[str, int | str]]]) ->
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     normalized_data: dict[str, list[dict[str, int | str]]] = {}
-    for category in sorted(categories):
+    for category, entries in categories.items():
         clean_category = category.strip()
         if not clean_category:
             continue
 
-        normalized_entries = normalize_category_entries(categories[clean_category])
+        normalized_entries = normalize_category_entries(entries)
         if normalized_entries:
             normalized_data[clean_category] = normalized_entries
 
@@ -113,6 +113,198 @@ def remove_category_entry(
 
     if not categories[clean_category]:
         del categories[clean_category]
+
+    save_category_settings(categories)
+    return categories
+
+
+def update_category_entry(
+    old_category: str,
+    old_subcategory: str,
+    new_category: str,
+    new_subcategory: str,
+    max_files: int,
+    output_name: str,
+    archive_name: str,
+) -> dict[str, list[dict[str, int | str]]]:
+    categories = load_category_settings()
+    clean_old_category = old_category.strip()
+    clean_old_subcategory = normalize_subcategory_path(old_subcategory)
+    clean_new_category = new_category.strip()
+    clean_new_subcategory = normalize_subcategory_path(new_subcategory)
+    clean_max_files = normalize_max_files(max_files)
+    clean_output_name = normalize_output_name(output_name)
+    clean_archive_name = normalize_archive_name(archive_name)
+
+    if not clean_new_category:
+        raise ValueError("نام کتگوری نمی‌تواند خالی باشد")
+
+    if not clean_new_subcategory:
+        raise ValueError("نام ساب‌کتگوری نمی‌تواند خالی باشد")
+
+    source_items = categories.get(clean_old_category)
+    if not source_items:
+        raise ValueError("کتگوری انتخاب‌شده پیدا نشد")
+
+    existing_entry = find_subcategory_entry(source_items, clean_old_subcategory)
+    if existing_entry is None:
+        raise ValueError("ساب‌کتگوری انتخاب‌شده پیدا نشد")
+
+    if not clean_archive_name:
+        clean_archive_name = normalize_archive_name(existing_entry.get("archive_name", ""))
+
+    if clean_old_category == clean_new_category and clean_old_subcategory == clean_new_subcategory:
+        existing_entry["max_files"] = clean_max_files
+        existing_entry["output_name"] = clean_output_name
+        existing_entry["archive_name"] = clean_archive_name
+        save_category_settings(categories)
+        return categories
+
+    target_items = categories.setdefault(clean_new_category, [])
+    duplicate_entry = find_subcategory_entry(target_items, clean_new_subcategory)
+    if duplicate_entry is not None:
+        raise ValueError("این ساب‌کتگوری قبلا ثبت شده است")
+
+    if clean_old_category == clean_new_category:
+        existing_entry["subcategory"] = clean_new_subcategory
+        existing_entry["max_files"] = clean_max_files
+        existing_entry["output_name"] = clean_output_name
+        existing_entry["archive_name"] = clean_archive_name
+        save_category_settings(categories)
+        return categories
+
+    categories[clean_old_category] = [
+        item for item in source_items
+        if item["subcategory"] != clean_old_subcategory
+    ]
+    if not categories[clean_old_category]:
+        del categories[clean_old_category]
+
+    if target_items:
+        clean_archive_name = normalize_archive_name(target_items[0].get("archive_name", clean_archive_name))
+
+    for item in target_items:
+        item["archive_name"] = clean_archive_name
+
+    target_items.append(
+        {
+            "subcategory": clean_new_subcategory,
+            "max_files": clean_max_files,
+            "output_name": clean_output_name,
+            "archive_name": clean_archive_name,
+        }
+    )
+
+    save_category_settings(categories)
+    return categories
+
+
+def rename_category(
+    old_category: str,
+    new_category: str,
+) -> dict[str, list[dict[str, int | str]]]:
+    categories = load_category_settings()
+    clean_old_category = old_category.strip()
+    clean_new_category = new_category.strip()
+
+    if not clean_new_category:
+        raise ValueError("نام کتگوری نمی‌تواند خالی باشد")
+
+    if clean_old_category not in categories:
+        raise ValueError("کتگوری انتخاب‌شده پیدا نشد")
+
+    if clean_old_category == clean_new_category:
+        return categories
+
+    source_items = categories[clean_old_category]
+    target_items = categories.get(clean_new_category)
+    if target_items is not None:
+        target_subcategories = {
+            str(item["subcategory"]) for item in target_items
+        }
+        duplicate_subcategories = [
+            str(item["subcategory"])
+            for item in source_items
+            if str(item["subcategory"]) in target_subcategories
+        ]
+        if duplicate_subcategories:
+            raise ValueError("در کتگوری مقصد ساب‌کتگوری تکراری وجود دارد")
+
+        target_items.extend(source_items)
+        del categories[clean_old_category]
+    else:
+        reordered_categories: dict[str, list[dict[str, int | str]]] = {}
+        for category, entries in categories.items():
+            if category == clean_old_category:
+                reordered_categories[clean_new_category] = entries
+            elif category != clean_new_category:
+                reordered_categories[category] = entries
+        categories = reordered_categories
+
+    save_category_settings(categories)
+    return categories
+
+
+def move_category(
+    category: str,
+    direction: int,
+) -> dict[str, list[dict[str, int | str]]]:
+    categories = load_category_settings()
+    clean_category = category.strip()
+    category_names = list(categories)
+
+    if clean_category not in categories:
+        return categories
+
+    current_index = category_names.index(clean_category)
+    target_index = current_index + direction
+    if target_index < 0 or target_index >= len(category_names):
+        return categories
+
+    category_names[current_index], category_names[target_index] = (
+        category_names[target_index],
+        category_names[current_index],
+    )
+
+    reordered_categories = {
+        category_name: categories[category_name]
+        for category_name in category_names
+    }
+    save_category_settings(reordered_categories)
+    return reordered_categories
+
+
+def move_subcategory(
+    category: str,
+    subcategory: str,
+    direction: int,
+) -> dict[str, list[dict[str, int | str]]]:
+    categories = load_category_settings()
+    clean_category = category.strip()
+    clean_subcategory = normalize_subcategory_path(subcategory)
+    entries = categories.get(clean_category)
+    if not entries:
+        return categories
+
+    current_index = next(
+        (
+            index
+            for index, entry in enumerate(entries)
+            if str(entry["subcategory"]) == clean_subcategory
+        ),
+        -1,
+    )
+    if current_index < 0:
+        return categories
+
+    target_index = current_index + direction
+    if target_index < 0 or target_index >= len(entries):
+        return categories
+
+    entries[current_index], entries[target_index] = (
+        entries[target_index],
+        entries[current_index],
+    )
 
     save_category_settings(categories)
     return categories
