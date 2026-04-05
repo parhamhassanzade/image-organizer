@@ -23,7 +23,7 @@ def create_zip_archive(
                     f"نام خروجی تکراری است و نمی‌تواند در آرشیو نهایی استفاده شود: {archive_name}"
                 )
 
-            archive.write(file_path, arcname=archive_name)
+            archive.write(file_path, arcname=f"{archive_stem}/{archive_stem}/{archive_name}")
             used_names.add(archive_name)
 
     if not archive_items:
