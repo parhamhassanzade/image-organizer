@@ -1,4 +1,5 @@
 from pathlib import Path
+from math import ceil
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QDragEnterEvent, QDropEvent, QFontMetrics
@@ -8,7 +9,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QGridLayout,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -27,7 +27,10 @@ from services.naming_service import generate_new_filename, sanitize_filename_par
 from ui.settings_dialog import SettingsDialog
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
-UPLOAD_COLUMNS = 4
+MAX_UPLOAD_COLUMNS = 3
+UPLOAD_CARD_MIN_WIDTH = 360
+UPLOAD_CARD_COMPACT_HEIGHT = 300
+UPLOAD_CARD_REGULAR_HEIGHT = 300
 
 
 class FileDropListWidget(QListWidget):
@@ -98,21 +101,23 @@ class SubcategoryUploadWidget(QFrame):
         self.file_collector = file_collector
         self.on_files_changed = on_files_changed
         self.selected_files = []
+        self.is_compact = False
 
         self.setup_ui()
         self.refresh_file_list()
         self.refresh_status()
+        self.set_compact_mode(False)
 
     def setup_ui(self):
         self.setObjectName("uploadCard")
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(12)
+        self.card_layout = QVBoxLayout(self)
+        self.card_layout.setContentsMargins(18, 18, 18, 18)
+        self.card_layout.setSpacing(12)
 
-        header_layout = QHBoxLayout()
-        header_layout.setSpacing(12)
+        self.header_layout = QBoxLayout(QBoxLayout.LeftToRight)
+        self.header_layout.setSpacing(12)
 
         title_layout = QVBoxLayout()
         title_layout.setSpacing(4)
@@ -132,34 +137,39 @@ class SubcategoryUploadWidget(QFrame):
         self.count_badge.setObjectName("statusBadge")
         self.count_badge.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
-        header_layout.addLayout(title_layout, 1)
-        header_layout.addWidget(self.count_badge, 0, Qt.AlignTop)
+        self.header_layout.addLayout(title_layout, 1)
+        self.header_layout.addWidget(self.count_badge, 0, Qt.AlignTop)
 
         self.file_list = FileDropListWidget(self.handle_dropped_paths)
         self.file_list.setObjectName("fileDropList")
-        self.file_list.setToolTip("فایل یا پوشه را رها کن")
+        self.file_list.setToolTip("عکس یا پوشهٔ شامل عکس را رها کن")
         self.file_list.setSpacing(6)
         self.file_list.setWordWrap(True)
         self.file_list.setMinimumHeight(190)
 
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(10)
+        self.actions_layout = QBoxLayout(QBoxLayout.LeftToRight)
+        self.actions_layout.setSpacing(10)
 
-        self.select_button = QPushButton("انتخاب")
+        self.select_button = QPushButton("انتخاب فایل")
         self.select_button.setObjectName("ghostButton")
         self.select_button.clicked.connect(self.select_files)
+
+        self.select_folder_button = QPushButton("انتخاب پوشه")
+        self.select_folder_button.setObjectName("ghostButton")
+        self.select_folder_button.clicked.connect(self.select_folder)
 
         self.clear_button = QPushButton("پاک کردن")
         self.clear_button.setObjectName("ghostButton")
         self.clear_button.clicked.connect(self.clear_files)
 
-        actions_layout.addWidget(self.select_button)
-        actions_layout.addWidget(self.clear_button)
-        actions_layout.addStretch()
+        self.actions_layout.addWidget(self.select_button)
+        self.actions_layout.addWidget(self.select_folder_button)
+        self.actions_layout.addWidget(self.clear_button)
+        self.actions_layout.addStretch()
 
-        layout.addLayout(header_layout)
-        layout.addWidget(self.file_list)
-        layout.addLayout(actions_layout)
+        self.card_layout.addLayout(self.header_layout)
+        self.card_layout.addWidget(self.file_list)
+        self.card_layout.addLayout(self.actions_layout)
 
     def set_files(self, files):
         self.selected_files = self.normalize_file_paths(files)
@@ -175,6 +185,25 @@ class SubcategoryUploadWidget(QFrame):
         )
         if files:
             self.update_selected_files(files, append=True)
+
+    def select_folder(self):
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            f"انتخاب پوشه برای {self.subcategory}",
+        )
+        if not folder:
+            return
+
+        files = self.file_collector([folder])
+        if not files:
+            QMessageBox.warning(
+                self,
+                "فایل نامعتبر",
+                "در پوشهٔ انتخاب‌شده عکسی پیدا نشد."
+            )
+            return
+
+        self.update_selected_files(files, append=True)
 
     def clear_files(self):
         self.selected_files = []
@@ -216,7 +245,7 @@ class SubcategoryUploadWidget(QFrame):
 
         if not self.selected_files:
             empty_item = QListWidgetItem(
-                "فایلی انتخاب نشده.\nرها کن یا انتخاب کن."
+                "فایلی انتخاب نشده.\nعکس یا پوشه را اینجا رها کن\nیا از دکمه‌های پایین استفاده کن."
             )
             empty_item.setFlags(Qt.NoItemFlags)
             empty_item.setTextAlignment(Qt.AlignCenter)
@@ -252,6 +281,29 @@ class SubcategoryUploadWidget(QFrame):
             f"{self.max_files} فایل | {output_preview}"
         )
 
+    def set_compact_mode(self, is_compact: bool):
+        self.is_compact = is_compact
+        self.header_layout.setDirection(
+            QBoxLayout.TopToBottom if is_compact else QBoxLayout.LeftToRight
+        )
+        self.actions_layout.setDirection(QBoxLayout.LeftToRight)
+        self.count_badge.setSizePolicy(
+            QSizePolicy.Expanding if is_compact else QSizePolicy.Maximum,
+            QSizePolicy.Fixed,
+        )
+        self.file_list.setMinimumHeight(180 if is_compact else 190)
+
+        for button in (self.select_button, self.select_folder_button, self.clear_button):
+            button.setMinimumHeight(46 if is_compact else 40)
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        if is_compact:
+            self.header_layout.setAlignment(Qt.AlignLeft)
+            self.actions_layout.setAlignment(Qt.AlignVCenter)
+        else:
+            self.header_layout.setAlignment(Qt.AlignTop)
+            self.actions_layout.setAlignment(Qt.AlignVCenter)
+
     @staticmethod
     def normalize_file_paths(files) -> list[str]:
         normalized_files = []
@@ -273,12 +325,13 @@ class MainWindow(QWidget):
         super().__init__()
         self.setWindowTitle("Image Organizer")
         self.resize(1120, 760)
-        self.setMinimumSize(720, 560)
+        self.setMinimumSize(380, 560)
 
         self.base_folder = ""
         self.category_settings = {}
         self.selected_files_by_category = {}
         self.upload_widgets = {}
+        self.uploads_placeholder = None
         self.last_output_path = ""
 
         self.setup_ui()
@@ -457,13 +510,14 @@ class MainWindow(QWidget):
         self.uploads_scroll_area = QScrollArea()
         self.uploads_scroll_area.setWidgetResizable(True)
         self.uploads_scroll_area.setFrameShape(QFrame.NoFrame)
+        self.uploads_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         self.uploads_container = QWidget()
         self.uploads_container_layout = QGridLayout(self.uploads_container)
         self.uploads_container_layout.setContentsMargins(0, 0, 0, 0)
         self.uploads_container_layout.setSpacing(14)
         self.uploads_container_layout.setAlignment(Qt.AlignTop)
-        for column in range(UPLOAD_COLUMNS):
+        for column in range(MAX_UPLOAD_COLUMNS):
             self.uploads_container_layout.setColumnStretch(column, 1)
         self.uploads_scroll_area.setWidget(self.uploads_container)
 
@@ -547,6 +601,8 @@ class MainWindow(QWidget):
             self.uploads_top.setAlignment(Qt.AlignTop)
             self.settings_header.setAlignment(Qt.AlignTop)
 
+        self.layout_upload_widgets()
+
     def collect_image_files(self, paths: list[str]) -> list[str]:
         collected_files = []
 
@@ -614,6 +670,7 @@ class MainWindow(QWidget):
 
     def refresh_upload_widgets(self):
         self.upload_widgets = {}
+        self.uploads_placeholder = None
         self.clear_layout(self.uploads_container_layout)
 
         category = self.category_combo.currentText()
@@ -626,7 +683,7 @@ class MainWindow(QWidget):
         category_uploads = self.selected_files_by_category.setdefault(category, {})
 
         self.uploads_hint.setText(
-            "برای هر ساب‌کتگوری فایل انتخاب کن."
+            "برای هر ساب‌کتگوری عکس را بکش و رها کن، یا فایل و پوشه انتخاب کن."
         )
 
         for entry in entries:
@@ -642,25 +699,75 @@ class MainWindow(QWidget):
             )
             upload_widget.set_files(category_uploads.get(subcategory, []))
             self.upload_widgets[subcategory] = upload_widget
-            row = len(self.upload_widgets) - 1
-            self.uploads_container_layout.addWidget(
-                upload_widget,
-                row // UPLOAD_COLUMNS,
-                row % UPLOAD_COLUMNS,
-            )
+
+        self.layout_upload_widgets()
 
     def add_uploads_placeholder(self, text: str):
-        placeholder = QLabel(text)
-        placeholder.setObjectName("outputLabel")
-        placeholder.setAlignment(Qt.AlignCenter)
-        placeholder.setWordWrap(True)
-        placeholder.setMinimumHeight(180)
+        self.uploads_placeholder = QLabel(text)
+        self.uploads_placeholder.setObjectName("outputLabel")
+        self.uploads_placeholder.setAlignment(Qt.AlignCenter)
+        self.uploads_placeholder.setWordWrap(True)
+        self.layout_upload_widgets()
+
+    def get_upload_columns(self) -> int:
+        available_width = self.uploads_scroll_area.viewport().width()
+        if available_width <= 0:
+            available_width = self.width() - 80
+
+        return max(1, min(MAX_UPLOAD_COLUMNS, available_width // UPLOAD_CARD_MIN_WIDTH))
+
+    def clear_upload_grid(self):
+        while self.uploads_container_layout.count():
+            self.uploads_container_layout.takeAt(0)
+
+    def update_upload_area_height(self, columns: int, compact_cards: bool):
+        item_count = len(self.upload_widgets) if self.upload_widgets else 1
+        rows = max(1, ceil(item_count / columns))
+        spacing = self.uploads_container_layout.spacing()
+        card_height = (
+            UPLOAD_CARD_COMPACT_HEIGHT if compact_cards else UPLOAD_CARD_REGULAR_HEIGHT
+        )
+
+        if compact_cards:
+            visible_rows = min(rows, 2)
+        else:
+            visible_rows = min(rows, 3)
+
+        min_height = (visible_rows * card_height) + ((visible_rows - 1) * spacing)
+        min_height += 12
+        self.uploads_scroll_area.setMinimumHeight(min_height)
+
+    def layout_upload_widgets(self):
+        columns = self.get_upload_columns()
+        compact_cards = columns == 1 or self.width() < 920
+
+        self.clear_upload_grid()
+        self.update_upload_area_height(columns, compact_cards)
+
+        for column in range(MAX_UPLOAD_COLUMNS):
+            stretch = 1 if column < columns else 0
+            self.uploads_container_layout.setColumnStretch(column, stretch)
+
+        if self.upload_widgets:
+            for index, widget in enumerate(self.upload_widgets.values()):
+                widget.set_compact_mode(compact_cards)
+                self.uploads_container_layout.addWidget(
+                    widget,
+                    index // columns,
+                    index % columns,
+                )
+            return
+
+        if self.uploads_placeholder is None:
+            return
+
+        self.uploads_placeholder.setMinimumHeight(220 if compact_cards else 180)
         self.uploads_container_layout.addWidget(
-            placeholder,
+            self.uploads_placeholder,
             0,
             0,
             1,
-            UPLOAD_COLUMNS,
+            columns,
         )
 
     def clear_layout(self, layout):

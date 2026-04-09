@@ -27,7 +27,7 @@ QFrame#surfaceCard {
 
 QFrame#uploadCard {
     background-color: #f8f4ed;
-    border: 1px solid #e4dacd;
+    border: 1px solid #e0d5c7;
     border-radius: 20px;
 }
 
@@ -150,9 +150,10 @@ QComboBox::down-arrow {
 }
 
 QListWidget#fileDropList {
-    background-color: #fffdf8;
-    border: 2px dashed #d5cbbd;
-    padding: 10px;
+    background-color: #fffaf2;
+    border: 2px dashed #ccbfae;
+    border-radius: 18px;
+    padding: 14px;
 }
 
 QListWidget#fileDropList[dragActive="true"] {
